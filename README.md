@@ -5,21 +5,20 @@ Based on production patterns from running multi-agent Claude Code deployments.
 ## Quick Start
 
 ```bash
+# Clone the repo
+git clone https://github.com/arturborycki/claudecode.git
+cd claudecode
+
 # One-time global setup
-./templates/setup-global.sh
+./setup-global.sh
 
 # Set up a new project
-./templates/setup-project.sh /path/to/my-project
-
-# Or from within the project directory
-cd /path/to/my-project
-/path/to/templates/setup-project.sh
+./setup-project.sh /path/to/my-project
 ```
 
 ## Folder Structure
 
 ```
-templates/
 ├── setup-global.sh                  # Script to install global config
 ├── setup-project.sh                 # Script to initialize new projects
 ├── global/                          # Copy to ~/.claude/
@@ -57,10 +56,10 @@ templates/
 
 ```bash
 # Global setup (one time)
-./templates/setup-global.sh
+./setup-global.sh
 
 # Per-project setup
-./templates/setup-project.sh /path/to/my-project
+./setup-project.sh /path/to/my-project
 ```
 
 ### Manual Installation
@@ -72,33 +71,33 @@ templates/
 
 ```bash
 # Copy all global files
-cp templates/global/.claude/MEMORY.md ~/.claude/
-cp templates/global/.claude/INFRASTRUCTURE.md ~/.claude/
-cp templates/global/.claude/settings.json ~/.claude/
+cp global/.claude/MEMORY.md ~/.claude/
+cp global/.claude/INFRASTRUCTURE.md ~/.claude/
+cp global/.claude/settings.json ~/.claude/
 
 # Copy global commands
-cp -r templates/global/.claude/commands ~/.claude/
+cp -r global/.claude/commands ~/.claude/
 
 # Copy global rules
 mkdir -p ~/.claude/rules
-cp -r templates/global/.claude/rules/* ~/.claude/rules/
+cp -r global/.claude/rules/* ~/.claude/rules/
 ```
 
 #### Per-Project Setup
 
 ```bash
 # From your project root:
-cp /path/to/templates/project/CLAUDE.md ./
-cp /path/to/templates/project/INFRASTRUCTURE.md ./
-cp /path/to/templates/project/_FRAGILE.md ./
-cp /path/to/templates/project/_NEXT_SESSION_MEMO.md ./
-cp /path/to/templates/project/_VOCABULARY.md ./
+cp /path/to/claudecode/project/CLAUDE.md ./
+cp /path/to/claudecode/project/INFRASTRUCTURE.md ./
+cp /path/to/claudecode/project/_FRAGILE.md ./
+cp /path/to/claudecode/project/_NEXT_SESSION_MEMO.md ./
+cp /path/to/claudecode/project/_VOCABULARY.md ./
 
 # Copy project .claude folder
-cp -r /path/to/templates/project/.claude ./
+cp -r /path/to/claudecode/project/.claude ./
 
 # Optional: Set up MCP servers
-cp /path/to/templates/project/.mcp.json.example ./.mcp.json
+cp /path/to/claudecode/project/.mcp.json.example ./.mcp.json
 # Then edit .mcp.json with your actual values
 ```
 
