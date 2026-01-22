@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh *dev*)",
+      "Bash(docker *)",
+      "Bash(kubectl get *)",
+      "Bash(kubectl describe *)",
+      "Bash(kubectl logs *)"
+    ],
+    "ask": [
+      "Bash(ssh *prod*)",
+      "Bash(ssh *bastion*)",
+      "Bash(kubectl apply *)",
+      "Bash(kubectl delete *)",
+      "Bash(psql *)",
+      "Bash(mysql *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*credentials*)",
+      "Read(**/*secrets*)",
+      "Read(~/.ssh/id_*)",
+      "Read(~/.aws/credentials)"
+    ]
+  },
+  "env": {
+    "KUBECONFIG": "~/.kube/config",
+    "AWS_PROFILE": "default",
+    "DOCKER_HOST": ""
+  }
+}
