@@ -86,6 +86,16 @@ if [ -d "$TEMPLATE_DIR/.claude/rules" ]; then
     done
 fi
 
+# Copy project commands (previously created the dir but never populated it)
+if [ -d "$TEMPLATE_DIR/.claude/commands" ]; then
+    for cmd_file in "$TEMPLATE_DIR/.claude/commands"/*.md; do
+        if [ -f "$cmd_file" ]; then
+            filename=$(basename "$cmd_file")
+            copy_file "$cmd_file" "$TARGET_DIR/.claude/commands/$filename" ".claude/commands/$filename"
+        fi
+    done
+fi
+
 # Ask about MCP config
 echo ""
 echo -e "${YELLOW}Do you want to include MCP server config template? (y/n)${NC}"
@@ -114,6 +124,20 @@ if [ -f "$TARGET_DIR/.gitignore" ]; then
 else
     echo "$GITIGNORE_ENTRIES" > "$TARGET_DIR/.gitignore"
     echo -e "  ${GREEN}[done]${NC} Created .gitignore with Claude entries"
+fi
+
+# Offer to install skills from the global library
+echo ""
+PICKER="$HOME/.claude/bin/claude-skills-init"
+[ -x "$PICKER" ] || PICKER="$SCRIPT_DIR/global/.claude/bin/claude-skills-init"
+if [ -x "$PICKER" ]; then
+    echo -e "${YELLOW}Add skills from your global library to this project? (y/n)${NC}"
+    read -r add_skills
+    if [[ "$add_skills" =~ ^[Yy]$ ]]; then
+        "$PICKER" --project "$TARGET_DIR" || echo -e "  ${YELLOW}Skill picker exited without installing.${NC}"
+    fi
+else
+    echo -e "${YELLOW}Tip:${NC} run setup-global.sh to enable per-project skill selection (claude-skills-init)."
 fi
 
 # Summary

@@ -110,6 +110,35 @@ if [ -d "$TEMPLATE_DIR/rules" ]; then
     done
 fi
 
+# Install skill library (a menu to pick from per-project; NOT active globally)
+echo ""
+echo -e "${BLUE}Installing skill library...${NC}"
+if [ -d "$TEMPLATE_DIR/skill-library" ]; then
+    mkdir -p "$TARGET_DIR/skill-library"
+    cp -R "$TEMPLATE_DIR/skill-library/." "$TARGET_DIR/skill-library/"
+    skill_count=$(find "$TARGET_DIR/skill-library" -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/SKILL.md' \; -print | wc -l | tr -d ' ')
+    echo -e "  ${GREEN}[done]${NC} skill-library/ ($skill_count skills)"
+else
+    echo -e "  ${YELLOW}[skip]${NC} no skill-library in templates"
+fi
+
+# Install the interactive skill picker to ~/.claude/bin
+echo ""
+echo -e "${BLUE}Installing skill picker...${NC}"
+mkdir -p "$TARGET_DIR/bin"
+if [ -f "$TEMPLATE_DIR/bin/claude-skills-init" ]; then
+    cp "$TEMPLATE_DIR/bin/claude-skills-init" "$TARGET_DIR/bin/claude-skills-init"
+    chmod +x "$TARGET_DIR/bin/claude-skills-init"
+    echo -e "  ${GREEN}[done]${NC} bin/claude-skills-init"
+    case ":$PATH:" in
+        *":$TARGET_DIR/bin:"*) : ;;
+        *) echo -e "  ${YELLOW}[note]${NC} add ~/.claude/bin to your PATH so 'claude-skills-init' is callable:"
+           echo -e "         echo 'export PATH=\"\$HOME/.claude/bin:\$PATH\"' >> ~/.bashrc" ;;
+    esac
+else
+    echo -e "  ${YELLOW}[skip]${NC} no picker in templates"
+fi
+
 # Summary
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -126,9 +155,11 @@ echo "  /plan      — Two-phase planning"
 echo "  /research  — Deep exploration"
 echo "  /infra     — Infrastructure reference"
 echo "  /new-project — Set up new project"
+echo "  /skills    — Add library skills to a project"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "  1. Edit ~/.claude/MEMORY.md with your coding standards"
 echo "  2. Edit ~/.claude/INFRASTRUCTURE.md with your servers"
 echo "  3. Review ~/.claude/settings.json permissions"
+echo "  4. In a project: run claude-skills-init (or /skills) to add skills"
 echo ""

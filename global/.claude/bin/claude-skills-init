@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+#
+# claude-skills-init — interactively choose skills from the global library and
+# install them into a project's .claude/skills/ directory.
+#
+# Installed to ~/.claude/bin/ by setup-global.sh. Run it from a project root,
+# or pass --project DIR. It presents a multi-select picker (gum > fzf > plain
+# bash) so you cherry-pick which skills a project gets instead of copying
+# folders by hand.
+
+set -euo pipefail
+
+LIBRARY="${CLAUDE_SKILL_LIBRARY:-$HOME/.claude/skill-library}"
+PROJECT_DIR="$PWD"
+MODE="copy"          # "copy" (git-shareable, default) or "link"
+FORCE=0
+LIST_ONLY=0
+
+c_bold=$'\033[1m'; c_dim=$'\033[2m'; c_grn=$'\033[32m'; c_yel=$'\033[33m'; c_blu=$'\033[34m'; c_rst=$'\033[0m'
+
+usage() {
+  cat <<USAGE
+${c_bold}claude-skills-init${c_rst} — pick skills from your global library for a project
+
+Usage: claude-skills-init [options]
+  --project DIR   Project to install into (default: current directory)
+  --library DIR   Library to choose from
+                  (default: \$CLAUDE_SKILL_LIBRARY or ~/.claude/skill-library)
+  --link          Symlink skills instead of copying (single source of truth;
+                  NOT shareable via git).
+  --force         Overwrite skills already present in the project.
+  --list          List available skills and exit.
+  -h, --help      Show this help.
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --project) PROJECT_DIR="$2"; shift 2;;
+    --library) LIBRARY="$2"; shift 2;;
+    --link)    MODE="link"; shift;;
+    --force)   FORCE=1; shift;;
+    --list)    LIST_ONLY=1; shift;;
+    -h|--help) usage; exit 0;;
+    *) echo "Unknown option: $1" >&2; usage; exit 1;;
+  esac
+done
+
+TARGET_DIR="$PROJECT_DIR/.claude/skills"
+
+[ -d "$LIBRARY" ] || { echo "${c_yel}Library not found:${c_rst} $LIBRARY" >&2
+  echo "Run setup-global.sh first, or pass --library DIR." >&2; exit 1; }
+
+# --- discover skills (any subdir of the library with a SKILL.md) ----------
+ids=(); descs=()
+while IFS= read -r d; do
+  id="$(basename "$d")"
+  desc="$(awk '
+    /^---[[:space:]]*$/ { c++; next }
+    c==1 && /^description:/ { sub(/^description:[[:space:]]*/,""); gsub(/^"|"$/,""); print; exit }
+  ' "$d/SKILL.md")"
+  short="${desc%%. *}"; short="${short:0:88}"
+  ids+=("$id"); descs+=("$short")
+done < <(find "$LIBRARY" -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/SKILL.md' \; -print | sort)
+
+[ "${#ids[@]}" -gt 0 ] || { echo "No skills found in $LIBRARY" >&2; exit 1; }
+labels=(); for i in "${!ids[@]}"; do labels+=("${ids[$i]}  —  ${descs[$i]}"); done
+
+if [ "$LIST_ONLY" -eq 1 ]; then
+  echo "Skills in $LIBRARY:"; printf '  %s\n' "${labels[@]}"; exit 0
+fi
+
+echo "${c_bold}Library:${c_rst} $LIBRARY"
+echo "${c_bold}Project:${c_rst} $TARGET_DIR   ${c_dim}(mode: $MODE)${c_rst}"; echo
+
+# --- pick -----------------------------------------------------------------
+chosen=()
+pick() { local lbl="$1" id; id="${lbl%%  —  *}"; id="${id%% *}"; chosen+=("$id"); }
+
+if command -v gum >/dev/null 2>&1; then
+  while IFS= read -r l; do [ -n "$l" ] && pick "$l"; done < <(
+    printf '%s\n' "${labels[@]}" | gum choose --no-limit \
+      --header "Select skills for this project (space toggles, enter confirms):")
+elif command -v fzf >/dev/null 2>&1; then
+  while IFS= read -r l; do [ -n "$l" ] && pick "$l"; done < <(
+    printf '%s\n' "${labels[@]}" | fzf --multi \
+      --header="TAB to select, ENTER to confirm, ESC to cancel" --prompt="skills> ")
+else
+  echo "Available skills:"
+  for i in "${!labels[@]}"; do printf "  ${c_grn}%2d${c_rst}) %s\n" "$((i+1))" "${labels[$i]}"; done; echo
+  read -rp "Enter numbers (e.g. 1 3 5), 'a' for all, 'q' to cancel: " answer
+  case "$answer" in
+    q|Q|"") echo "Cancelled."; exit 0;;
+    a|A) chosen=("${ids[@]}");;
+    *) for n in $answer; do [[ "$n" =~ ^[0-9]+$ ]] || continue
+         idx=$((n-1)); [ "$idx" -ge 0 ] && [ "$idx" -lt "${#ids[@]}" ] && chosen+=("${ids[$idx]}"); done;;
+  esac
+fi
+[ "${#chosen[@]}" -gt 0 ] || { echo "Nothing selected."; exit 0; }
+
+# --- install skills -------------------------------------------------------
+mkdir -p "$TARGET_DIR"; installed=0; skipped=0
+for id in "${chosen[@]}"; do
+  src="$LIBRARY/$id"; dest="$TARGET_DIR/$id"
+  if [ -e "$dest" ] && [ "$FORCE" -eq 0 ]; then
+    echo "  ${c_yel}skip${c_rst}  $id (present; --force to overwrite)"; skipped=$((skipped+1)); continue
+  fi
+  rm -rf "$dest"
+  if [ "$MODE" = "link" ]; then ln -s "$src" "$dest"; else cp -R "$src" "$dest"; fi
+  echo "  ${c_grn}add${c_rst}   skills/$id"; installed=$((installed+1))
+done
+
+# --- optional: agents + rules that ship with the library ------------------
+if [ -d "$LIBRARY/agents" ]; then
+  read -rp "Install bundled agent(s) into .claude/agents/? [y/N] " yn
+  if [[ "$yn" =~ ^[Yy]$ ]]; then
+    mkdir -p "$PROJECT_DIR/.claude/agents"; cp -R "$LIBRARY/agents/." "$PROJECT_DIR/.claude/agents/"
+    echo "  ${c_grn}add${c_rst}   .claude/agents/"
+  fi
+fi
+if [ -d "$LIBRARY/rules" ]; then
+  read -rp "Install bundled rule(s) into .claude/rules/? [y/N] " yn
+  if [[ "$yn" =~ ^[Yy]$ ]]; then
+    mkdir -p "$PROJECT_DIR/.claude/rules"; cp -R "$LIBRARY/rules/." "$PROJECT_DIR/.claude/rules/"
+    echo "  ${c_grn}add${c_rst}   .claude/rules/"
+  fi
+fi
+
+echo
+echo "${c_bold}Done.${c_rst} $installed skill(s) installed, $skipped skipped → $TARGET_DIR"
+echo "${c_dim}First time in this repo, Claude Code asks you to trust the workspace before loading project skills. Changes take effect live — no restart.${c_rst}"

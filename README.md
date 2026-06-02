@@ -26,6 +26,9 @@ cd claudecode
 │       ├── MEMORY.md                # System-wide standards (all projects)
 │       ├── INFRASTRUCTURE.md        # Global server/service reference
 │       ├── settings.json            # Global permissions & env vars
+│       ├── skill-library/           # Menu of skills to pick from per-project (NEW)
+│       ├── bin/
+│       │   └── claude-skills-init   # Interactive skill picker (NEW)
 │       ├── commands/                # Global custom commands
 │       │   ├── wrap.md              # /wrap — End session, commit
 │       │   ├── sup.md               # /sup — Quick status check
@@ -33,7 +36,8 @@ cd claudecode
 │       │   ├── plan.md              # /plan — Two-phase planning
 │       │   ├── research.md          # /research — Deep exploration
 │       │   ├── infra.md             # /infra — Infrastructure reference
-│       │   └── new-project.md       # /new-project — Initialize project
+│       │   ├── new-project.md       # /new-project — Initialize project
+│       │   └── skills.md            # /skills — Add library skills to a project (NEW)
 │       └── rules/
 │           └── infrastructure-access.md  # Global infra access rules
 │
@@ -116,6 +120,51 @@ After installing the global commands, use them in any Claude Code session:
 | `/research` | Deep exploration | Investigation tasks |
 | `/infra` | Infrastructure reference | Before server/DB operations |
 | `/new-project` | Initialize new project | Starting a new codebase |
+| `/skills` | Add skills from the library | Project needs domain skills |
+
+## Skills & Agents
+
+Skills are reusable playbooks Claude loads on demand; agents are specialized
+workers. This repo ships a **skill library** (a menu) plus a picker so each
+project gets only the skills it needs — global skills would clutter every
+unrelated project with descriptions they don't use.
+
+```
+~/.claude/skill-library/   # installed by setup-global.sh — the menu
+~/.claude/bin/claude-skills-init   # the interactive picker
+```
+
+### Add skills to a project
+
+`setup-project.sh` offers to run the picker at the end. To add skills later,
+from the project root:
+
+```bash
+claude-skills-init            # interactive multi-select (gum > fzf > plain)
+claude-skills-init --list     # just list what's available
+claude-skills-init --link     # symlink instead of copy (single source of truth)
+```
+
+Selected skills land in `.claude/skills/`. The picker also offers the bundled
+agent (`engine-dev`) into `.claude/agents/` and rules into `.claude/rules/`.
+Inside a session you can use `/skills` instead of dropping to the shell.
+
+### What's in the library
+
+A database / query-engine internals set (14 skills) for C/C++/Rust work —
+query plan design, SQL front end, optimizer, joins, columnar/Arrow layout,
+storage & indexing, page/file formats, LSM storage, transactions & recovery,
+parallel execution, replication & consistency, consensus, distributed
+transactions, and testing — plus an `engine-dev` agent. See
+`global/.claude/skill-library/README.md`. Drop your own skill folders into the
+library to extend the menu.
+
+### A note on hooks
+
+A hook can't present the picker — Claude Code hooks are non-interactive
+scripts (their stdin is JSON event context, not your keyboard). The live
+checkbox menu only works in your terminal, so the picker is a standalone
+script; `/skills` and `setup-project.sh` are the integration points.
 
 ## Startup Prompt Template
 

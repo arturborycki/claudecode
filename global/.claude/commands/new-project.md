@@ -33,7 +33,18 @@ Set up a new project with all standard Claude Code configuration files.
      _NEXT_SESSION_MEMO.md
      ```
 
-6. **Customize CLAUDE.md**
+6. **Offer skills from the global library**
+   - Ask whether this project needs skills from `~/.claude/skill-library/`
+     (e.g. database / query-engine work).
+   - If yes, run the picker for them:
+     ```bash
+     claude-skills-init --project .
+     ```
+     or list the library and copy the chosen `SKILL.md` folders into
+     `.claude/skills/`. Offer the bundled agent (`engine-dev`) and rule
+     (`engine-internals`) when relevant.
+
+7. **Customize CLAUDE.md**
    - Ask for project name
    - Ask for brief description
    - Ask for tech stack
@@ -51,6 +62,7 @@ Set up a new project with all standard Claude Code configuration files.
 - [x] _NEXT_SESSION_MEMO.md
 - [x] _VOCABULARY.md
 - [x] .claude/rules/infrastructure.md
+- [x] .claude/skills/ (selected from library, if any)
 - [x] .gitignore updated
 
 ### Next Steps
@@ -65,6 +77,8 @@ Read CLAUDE.md. Working on [first task].
 
 ## Template Location
 
-Templates are stored at: `~/Workfiles/claudecode/templates/project/`
+Project templates live in the cloned repo at `project/`; global config and the
+skill library live at `~/.claude/` after `setup-global.sh` (skill library at
+`~/.claude/skill-library/`, picker at `~/.claude/bin/claude-skills-init`).
 
 If templates aren't found, create minimal versions inline.
