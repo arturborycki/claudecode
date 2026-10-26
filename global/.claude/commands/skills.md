@@ -21,8 +21,11 @@ per-project keeps unrelated projects free of skills they don't need.
 
 4. **Install.** Copy each selected skill folder into `./.claude/skills/`
    (create it if needed). Skip ones already present unless told to overwrite.
-   Offer the bundled `agents/engine-dev.md` and `rules/engine-internals.md`
-   too if the project is a database/query-engine codebase.
+   Offer the bundled agent team (`agents/`: `rdbms-architect` plus the
+   specialists and `engine-dev`) and `rules/` (`engine-internals.md`,
+   `rdbms-expert-method.md`) too if the project is a database/query-engine
+   codebase. Agents preload skills by name, so install every skill listed
+   in an installed agent's `skills:` frontmatter.
 
 5. **Confirm.** List exactly what was installed. Remind the user that Claude
    Code will prompt to trust the workspace the first time, and that skill

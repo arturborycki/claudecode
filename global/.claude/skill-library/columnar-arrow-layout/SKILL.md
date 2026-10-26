@@ -68,3 +68,8 @@ mask. Type coercion rules decide the output type of mixed-type binary ops.
 ## Grounding
 HQEW *Apache Arrow* (why columnar, memory layout, record batches, schemas/
 types) and *Type System* (column vectors, literals, type coercion).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Column Stores* (p.518); *Cache-Conscious Query Processing* (p.389); *Architecture-Conscious Database System* (p.155); *Processor Cache* (p.2887).
+Go deeper with: `olap-and-warehouse-engines`, `dbms-architecture`.

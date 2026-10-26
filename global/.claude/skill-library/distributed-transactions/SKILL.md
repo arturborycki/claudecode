@@ -87,3 +87,8 @@ distributed commit at all.
 Petrov Ch 13 (making operations atomic, 2PC, 3PC, Calvin, Spanner, database
 partitioning, Percolator, coordination avoidance). DBMS Ch 20 (distributed
 commit, distributed locking).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Two-Phase Commit* (p.4259); *Three-Phase Commit* (p.4127); *Distributed Transaction Management* (p.1222); *Distributed Concurrency Control* (p.1157); *Distributed Deadlock Management* (p.1181).
+Go deeper with: `distributed-dbms-design`, `concurrency-control-theory`, `recovery-and-durability`.

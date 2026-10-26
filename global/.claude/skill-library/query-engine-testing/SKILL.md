@@ -74,3 +74,8 @@ HQEW *Testing* (why engines are hard to test, unit/integration/fuzz/golden
 testing, testing optimizations, testing parallel/distributed execution, CI)
 and *Benchmarks* (measuring performance/scalability, concurrency, TPC
 benchmarks, common pitfalls).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Database Benchmarks* (p.936); *Microbenchmark* (p.2255); *Application Benchmark* (p.122); *Benchmark Frameworks* (p.267); *Data Generation* (p.772); *Real and Synthetic Test Datasets* (p.3110).
+Go deeper with: `tuning-and-benchmarking`, `sql-semantics-and-active-rules`.

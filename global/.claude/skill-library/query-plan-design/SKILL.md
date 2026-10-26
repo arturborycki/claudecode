@@ -83,3 +83,8 @@ build. Wire it before you wire execution.
 HQEW *Logical Plans and Expressions*, *Physical Plans and Expressions*,
 *Query Planner*. DBMS §15.1 (physical-query-plan operators), §16.3 (parse
 trees → logical query plans).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Query Plan* (p.3020); *Iterator* (p.2042); *Pipeline* (p.2767); *Query Processor* (p.3058); *Evaluation of Relational Operators* (p.1348).
+Go deeper with: `query-execution-advanced`, `dbms-architecture`.

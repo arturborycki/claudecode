@@ -100,3 +100,8 @@ DBMS Ch 17 (undo/redo/undo-redo logging, media failure), Ch 18
 (serializability, locking, lock modes, hierarchies, tree protocol), Ch 19
 (recoverability, deadlocks). Petrov Ch 5 (buffer management, recovery,
 concurrency control: optimistic, MVCC, timestamp ordering).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*ACID Properties* (p.23); *Two-Phase Locking* (p.4270); *Multiversion Serializability and Concurrency Control* (p.2454); *Snapshot Isolation* (p.3513); *Logging and Recovery* (p.2133); *Multilevel Recovery and the ARIES Algorithm* (p.2344).
+Go deeper with: `concurrency-control-theory`, `recovery-and-durability`, `temporal-databases`.

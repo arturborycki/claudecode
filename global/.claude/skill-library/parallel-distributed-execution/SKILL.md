@@ -84,3 +84,8 @@ HQEW *Parallel Query Execution* and *Distributed Query Execution*
 (partitioning, exchange, query stages, distributed aggregates/joins,
 streaming vs blocking, locality, serialization). DBMS Ch 20 (parallel
 algorithms on relations, map-reduce, distributed query processing).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Parallel Query Processing* (p.2677); *Intra-operator Parallelism* (p.2030); *Data Partitioning* (p.802); *Parallel Hash Join, Parallel Merge Join, Parallel Nested Loops Join* (p.2666); *Execution Skew* (p.1412).
+Go deeper with: `parallel-database-systems`, `distributed-dbms-design`.

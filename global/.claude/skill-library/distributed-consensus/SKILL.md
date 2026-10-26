@@ -88,3 +88,8 @@ Petrov Ch 8 (concurrent execution, Two Generals, FLP, synchrony, failure
 models), Ch 9 (failure detection: heartbeats, phi-accrual, gossip), Ch 10
 (leader election), Ch 14 (broadcast, atomic broadcast, Paxos, Raft,
 Byzantine consensus).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Replication Based on Paxos* (p.3184); *Replication Based on Group Communication* (p.3177); *Physical Clock* (p.2758).
+Go deeper with: `replication-protocols`, `distributed-dbms-design`.

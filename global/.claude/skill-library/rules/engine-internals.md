@@ -10,7 +10,10 @@ SQL → parse → logical plan → optimize → physical plan → execute over
 columnar batches, on a storage engine (B-tree or LSM) over slotted pages,
 with transactions/recovery underneath and parallelism/replication/consensus
 on top. Map every task to a point on this spine and load the matching
-skill(s) before writing code.
+skill(s) before writing code. For theory, less-common subsystems (temporal,
+streams, OLAP, security, IVM) and literature depth, use the EDBS expansion
+skills and `edbs-reference`; for cross-cutting work, start with the
+`rdbms-architect` agent. Working method: `rules/rdbms-expert-method.md`.
 
 ## Hard rules (non-negotiable)
 1. **Correctness gates before performance.** Never change observable query

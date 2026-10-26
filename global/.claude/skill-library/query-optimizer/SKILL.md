@@ -83,3 +83,8 @@ results but doesn't actually fire is a silent regression. See
 DBMS §16.2 (algebraic laws), §16.4 (cost estimation), §16.5 (cost-based
 plan selection), §16.6 (join ordering). HQEW *Query Optimizations*
 (rule-based vs cost-based, projection/predicate push-down, CSE).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Query Optimization (in Relational Databases)* (p.3009); *System R (R*) Optimizer* (p.3866); *Join Order* (p.2051); *Cost Estimation* (p.647); *Selectivity Estimation* (p.3371); *Query Rewriting* (p.3060).
+Go deeper with: `cardinality-and-statistics`, `relational-theory`, `materialized-views-ivm`.

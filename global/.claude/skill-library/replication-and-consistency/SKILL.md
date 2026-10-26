@@ -84,3 +84,8 @@ Petrov Ch 11 (availability, CAP, ordering, consistency models, session
 models, eventual/tunable consistency, witness replicas, CRDTs), Ch 12
 (read repair, digest reads, hinted handoff, Merkle trees, bitmap version
 vectors, gossip dissemination).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Consistency Models for Replicated Data* (p.582); *CAP Theorem* (p.395); *Eventual Consistency* (p.1403); *Quorum Systems* (p.3064); *Replicated Data Types* (p.3171).
+Go deeper with: `replication-protocols`.

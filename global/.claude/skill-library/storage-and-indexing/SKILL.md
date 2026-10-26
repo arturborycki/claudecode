@@ -80,3 +80,8 @@ weighs query benefit against update overhead.
 DBMS Ch 13 (storage), Ch 14 (index structures: B-trees, hashing, bitmap),
 §15.7 (buffer management). Petrov Ch 2, 4 (B-tree basics & implementation),
 Ch 6 (variants), Ch 5 (buffer management).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Buffer Management* (p.350); *Buffer Pool* (p.360); *B+-Tree* (p.247); *Hash-Based Indexing* (p.1683); *Bitmap Index* (p.311); *Secondary Index* (p.3337).
+Go deeper with: `index-structures-catalog`, `multidimensional-and-similarity-indexing`, `dbms-architecture`.

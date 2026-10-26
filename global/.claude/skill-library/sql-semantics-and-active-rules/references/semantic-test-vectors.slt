@@ -1,0 +1,1177 @@
+# Semantic test vectors for SQL engines (sqllogictest format).
+# Verified 2026-10 against PostgreSQL 16.15 (all applicable records) and DuckDB 1.1.3
+# (records not marked onlyif postgresql / skipif duckdb).
+# Conventions: one row per line, columns separated by one space, NULL as NULL, '' as (empty).
+# Three-valued results are rendered as T/F/U through CASE WHEN p THEN 'T' WHEN NOT p THEN 'F' ELSE 'U' END.
+# Records marked "onlyif postgresql" use PG syntax or show the standard behaviour where DuckDB 1.1 lacks the feature;
+# "skipif duckdb" marks a documented DuckDB deviation from the standard.
+
+# ---------- fixtures ----------
+statement ok
+CREATE TABLE t(a INTEGER, b INTEGER)
+
+statement ok
+INSERT INTO t VALUES (1,10),(2,NULL),(NULL,30),(NULL,NULL),(1,10)
+
+statement ok
+CREATE TABLE e(a INTEGER)
+
+statement ok
+CREATE TABLE s(x INTEGER)
+
+statement ok
+INSERT INTO s VALUES (1),(NULL)
+
+statement ok
+CREATE TABLE l(id INTEGER, v VARCHAR)
+
+statement ok
+INSERT INTO l VALUES (1,'a'),(2,'b'),(3,NULL)
+
+statement ok
+CREATE TABLE r(id INTEGER, w VARCHAR)
+
+statement ok
+INSERT INTO r VALUES (1,'x'),(1,'y'),(NULL,'z')
+
+statement ok
+CREATE TABLE w(g VARCHAR, o INTEGER, v INTEGER)
+
+statement ok
+INSERT INTO w VALUES ('a',1,10),('a',2,20),('a',2,30),('a',5,40),('b',1,5),('b',NULL,7)
+
+# ---------- A: three-valued logic ----------
+# A1
+query T
+SELECT CASE WHEN NULL = NULL THEN 'T' WHEN NOT (NULL = NULL) THEN 'F' ELSE 'U' END
+----
+U
+
+# A2
+query TT
+SELECT CASE WHEN (CAST(NULL AS BOOLEAN) AND FALSE) THEN 'T' WHEN NOT (CAST(NULL AS BOOLEAN) AND FALSE) THEN 'F' ELSE 'U' END,
+       CASE WHEN (CAST(NULL AS BOOLEAN) OR TRUE) THEN 'T' WHEN NOT (CAST(NULL AS BOOLEAN) OR TRUE) THEN 'F' ELSE 'U' END
+----
+F T
+
+# A3
+query T
+SELECT CASE WHEN NOT CAST(NULL AS BOOLEAN) THEN 'T' WHEN NOT NOT CAST(NULL AS BOOLEAN) THEN 'F' ELSE 'U' END
+----
+U
+
+# A4
+query TTT
+SELECT CASE WHEN NULL IS NULL THEN 'T' ELSE 'F' END,
+       CASE WHEN NULL IS DISTINCT FROM NULL THEN 'T' ELSE 'F' END,
+       CASE WHEN 1 IS DISTINCT FROM NULL THEN 'T' ELSE 'F' END
+----
+T F T
+
+# A5
+query TT
+SELECT CASE WHEN 1 BETWEEN 0 AND NULL THEN 'T' WHEN NOT (1 BETWEEN 0 AND NULL) THEN 'F' ELSE 'U' END,
+       CASE WHEN 5 BETWEEN 6 AND NULL THEN 'T' WHEN NOT (5 BETWEEN 6 AND NULL) THEN 'F' ELSE 'U' END
+----
+U F
+
+# A6
+query T
+SELECT CASE WHEN CAST(NULL AS VARCHAR) LIKE 'a%' THEN 'T' WHEN NOT (CAST(NULL AS VARCHAR) LIKE 'a%') THEN 'F' ELSE 'U' END
+----
+U
+
+# A7 simple CASE compares with =, so NULL never matches
+query T
+SELECT CASE CAST(NULL AS INTEGER) WHEN NULL THEN 'match' ELSE 'nomatch' END
+----
+nomatch
+
+# A8
+query II
+SELECT COALESCE(NULL, NULL, 3), NULLIF(1, 1)
+----
+3 NULL
+
+# A9
+query T
+SELECT 'abc' || CAST(NULL AS VARCHAR)
+----
+NULL
+
+# A10 WHERE keeps only TRUE rows
+query I
+SELECT count(*) FROM t WHERE b = b
+----
+3
+
+# A11 negation does not resurrect UNKNOWN rows
+query I
+SELECT count(*) FROM t WHERE NOT (b = 10)
+----
+1
+
+# A12 row-value comparison (DuckDB compares STRUCT-typed rows with NULL as an ordinary value: first column F)
+skipif duckdb
+query TTT
+SELECT CASE WHEN (1, NULL) = (1, 2) THEN 'T' WHEN NOT ((1, NULL) = (1, 2)) THEN 'F' ELSE 'U' END,
+       CASE WHEN (1, NULL) = (2, 2) THEN 'T' WHEN NOT ((1, NULL) = (2, 2)) THEN 'F' ELSE 'U' END,
+       CASE WHEN (1, NULL) < (2, NULL) THEN 'T' WHEN NOT ((1, NULL) < (2, NULL)) THEN 'F' ELSE 'U' END
+----
+U F T
+
+# A13 row IS NULL is not the negation of row IS NOT NULL
+onlyif postgresql
+query TTT
+SELECT CASE WHEN ROW(NULL, NULL) IS NULL THEN 'T' ELSE 'F' END,
+       CASE WHEN ROW(1, NULL) IS NULL THEN 'T' ELSE 'F' END,
+       CASE WHEN ROW(1, NULL) IS NOT NULL THEN 'T' ELSE 'F' END
+----
+T F F
+
+# A14 searched CASE: UNKNOWN goes to ELSE
+query I
+SELECT CASE WHEN NULL THEN 1 ELSE 2 END
+----
+2
+
+# A15 empty string is not NULL (Oracle differs)
+query T
+SELECT CASE WHEN '' IS NULL THEN 'T' ELSE 'F' END
+----
+F
+
+# A16 division by zero is an exception, not NULL (DuckDB returns NULL)
+skipif duckdb
+statement error
+SELECT 1 / 0
+
+# A17 CHECK rejects only FALSE; UNKNOWN passes
+statement ok
+CREATE TABLE ck(x INTEGER CHECK (x > 0))
+
+statement ok
+INSERT INTO ck VALUES (NULL)
+
+statement error
+INSERT INTO ck VALUES (-1)
+
+# A18 IS [NOT] TRUE collapses UNKNOWN to a definite answer
+query II
+SELECT count(*) FILTER (WHERE (b = 10) IS NOT TRUE), count(*) FILTER (WHERE (b = 10) IS UNKNOWN) FROM t
+----
+3 2
+
+# A19 EXISTS is two-valued: a row of NULLs is still a row
+query T
+SELECT CASE WHEN EXISTS (SELECT NULL) THEN 'T' ELSE 'F' END
+----
+T
+
+# A20 the tautology a = 1 OR a <> 1 is not certain-true in SQL: NULL rows are dropped
+query I
+SELECT count(*) FROM t WHERE a = 1 OR a <> 1
+----
+3
+
+# ---------- B: IN / NOT IN / quantified comparisons ----------
+# B1
+query TTTT
+SELECT CASE WHEN 1 IN (1, NULL) THEN 'T' WHEN NOT (1 IN (1, NULL)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 2 IN (1, NULL) THEN 'T' WHEN NOT (2 IN (1, NULL)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 2 NOT IN (1, NULL) THEN 'T' WHEN NOT (2 NOT IN (1, NULL)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 1 NOT IN (1, NULL) THEN 'T' WHEN NOT (1 NOT IN (1, NULL)) THEN 'F' ELSE 'U' END
+----
+T U U F
+
+# B2 NULL against an empty subquery is decided, not unknown
+query TT
+SELECT CASE WHEN CAST(NULL AS INTEGER) IN (SELECT a FROM e) THEN 'T' WHEN NOT (CAST(NULL AS INTEGER) IN (SELECT a FROM e)) THEN 'F' ELSE 'U' END,
+       CASE WHEN CAST(NULL AS INTEGER) NOT IN (SELECT a FROM e) THEN 'T' WHEN NOT (CAST(NULL AS INTEGER) NOT IN (SELECT a FROM e)) THEN 'F' ELSE 'U' END
+----
+F T
+
+# B3 NULL against a non-empty list is unknown
+query T
+SELECT CASE WHEN CAST(NULL AS INTEGER) NOT IN (1, 2) THEN 'T' WHEN NOT (CAST(NULL AS INTEGER) NOT IN (1, 2)) THEN 'F' ELSE 'U' END
+----
+U
+
+# B4 the NOT IN trap: one NULL in the subquery empties the result
+query I
+SELECT count(*) FROM t WHERE a NOT IN (SELECT x FROM s)
+----
+0
+
+# B5 NOT EXISTS is not NOT IN
+query I
+SELECT count(*) FROM t WHERE NOT EXISTS (SELECT 1 FROM s WHERE s.x = t.a)
+----
+3
+
+# B6 NOT IN with NULL-free subquery but NULL outer values
+query I
+SELECT count(*) FROM t WHERE a NOT IN (SELECT x FROM s WHERE x IS NOT NULL)
+----
+1
+
+# B7 quantifiers over the empty set
+query TTT
+SELECT CASE WHEN 5 > ALL (SELECT a FROM e) THEN 'T' WHEN NOT (5 > ALL (SELECT a FROM e)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 5 > ANY (SELECT a FROM e) THEN 'T' WHEN NOT (5 > ANY (SELECT a FROM e)) THEN 'F' ELSE 'U' END,
+       CASE WHEN CAST(NULL AS INTEGER) > ALL (SELECT a FROM e) THEN 'T' WHEN NOT (CAST(NULL AS INTEGER) > ALL (SELECT a FROM e)) THEN 'F' ELSE 'U' END
+----
+T F T
+
+# B8 quantifiers over a set containing NULL
+query TTTT
+SELECT CASE WHEN 5 > ALL (SELECT x FROM s) THEN 'T' WHEN NOT (5 > ALL (SELECT x FROM s)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 0 > ALL (SELECT x FROM s) THEN 'T' WHEN NOT (0 > ALL (SELECT x FROM s)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 5 = ANY (SELECT x FROM s) THEN 'T' WHEN NOT (5 = ANY (SELECT x FROM s)) THEN 'F' ELSE 'U' END,
+       CASE WHEN 1 = ANY (SELECT x FROM s) THEN 'T' WHEN NOT (1 = ANY (SELECT x FROM s)) THEN 'F' ELSE 'U' END
+----
+U F U T
+
+# B9 IN must not multiply outer rows (semi-join, not join)
+query I
+SELECT count(*) FROM (VALUES (1)) v(x) WHERE x IN (SELECT a FROM t)
+----
+1
+
+# B10 unqualified name in a subquery binds to the OUTER table when the inner one lacks it
+query I
+SELECT count(*) FROM l WHERE id IN (SELECT id FROM s)
+----
+3
+
+# ---------- C: aggregates and grouping ----------
+# C1
+query IIIIII
+SELECT count(*), count(a), count(b), sum(a), min(b), max(b) FROM t
+----
+5 3 3 4 10 30
+
+# C2 scalar aggregate over empty input: exactly one row
+query IIIII
+SELECT count(*), count(a), sum(a), min(a), max(a) FROM e
+----
+0 0 NULL NULL NULL
+
+# C3
+query T
+SELECT CASE WHEN avg(a) IS NULL THEN 'null' ELSE 'notnull' END FROM e
+----
+null
+
+# C4 grouped aggregate over empty input: zero rows
+query I
+SELECT count(*) FROM e GROUP BY a
+----
+
+# C5 GROUP BY () over empty input: one row (grand total)
+query I
+SELECT count(*) FROM e GROUP BY ()
+----
+0
+
+# C6 NULLs form one group
+query II rowsort
+SELECT a, count(*) FROM t GROUP BY a
+----
+1 2
+2 1
+NULL 2
+
+# C7 SUM over only-NULL input is NULL, not 0
+query I
+SELECT sum(b) FROM t WHERE b IS NULL
+----
+NULL
+
+# C8 COUNT(DISTINCT) ignores NULL
+query II
+SELECT count(DISTINCT a), count(DISTINCT b) FROM t
+----
+2 2
+
+# C9 HAVING without GROUP BY treats the input as one group
+query I
+SELECT count(*) FROM t HAVING count(*) > 10
+----
+
+query I
+SELECT count(*) FROM e HAVING count(*) = 0
+----
+0
+
+# C10 FILTER clause
+query II
+SELECT count(*) FILTER (WHERE a = 1), sum(b) FILTER (WHERE a IS NULL) FROM t
+----
+2 30
+
+# C11 scalar subquery: zero rows -> NULL
+query T
+SELECT CASE WHEN (SELECT a FROM e) IS NULL THEN 'null' ELSE 'notnull' END
+----
+null
+
+# C12 scalar subquery: more than one row -> cardinality violation
+statement error
+SELECT (SELECT a FROM t)
+
+# C13 ROLLUP: GROUPING() distinguishes a super-aggregate NULL from a data NULL
+query III rowsort
+SELECT a, GROUPING(a), count(*) FROM t GROUP BY ROLLUP(a)
+----
+1 0 2
+2 0 1
+NULL 0 2
+NULL 1 5
+
+# C14 exact numeric aggregation is exact; binary floating point is not
+query TT
+SELECT CASE WHEN sum(x) = 0.3 THEN 'T' ELSE 'F' END,
+       CASE WHEN sum(CAST(x AS DOUBLE PRECISION)) = CAST(0.3 AS DOUBLE PRECISION) THEN 'T' ELSE 'F' END
+FROM (VALUES (CAST(0.1 AS DECIMAL(10,2))), (CAST(0.2 AS DECIMAL(10,2)))) v(x)
+----
+T F
+
+# ---------- D: duplicates, DISTINCT and set operators ----------
+# D1 DISTINCT treats NULLs as not distinct
+query I rowsort
+SELECT DISTINCT a FROM t
+----
+1
+2
+NULL
+
+# D2
+query I
+SELECT count(*) FROM (SELECT DISTINCT a, b FROM t) q
+----
+4
+
+# D3 set operators match NULL with NULL
+query I rowsort
+SELECT a FROM t INTERSECT SELECT x FROM s
+----
+1
+NULL
+
+query I rowsort
+SELECT a FROM t EXCEPT SELECT x FROM s
+----
+2
+
+query I rowsort
+SELECT a FROM t UNION SELECT x FROM s
+----
+1
+2
+NULL
+
+# D4 UNION ALL adds multiplicities
+query I
+SELECT count(*) FROM (SELECT a FROM t UNION ALL SELECT x FROM s) q
+----
+7
+
+# D5 INTERSECT ALL takes min, EXCEPT ALL takes monus
+query I rowsort
+SELECT x FROM (VALUES (1),(1),(2)) r(x) INTERSECT ALL SELECT x FROM (VALUES (1),(1),(1),(3)) s(x)
+----
+1
+1
+
+query I rowsort
+SELECT x FROM (VALUES (1),(1),(1),(2)) r(x) EXCEPT ALL SELECT x FROM (VALUES (1)) s(x)
+----
+1
+1
+2
+
+# D6 set-semantics INTERSECT/EXCEPT de-duplicate the operands first
+query I
+SELECT count(*) FROM (SELECT x FROM (VALUES (1),(1),(2)) r(x) EXCEPT SELECT x FROM (VALUES (2)) s(x)) q
+----
+1
+
+# D7 bag intersection does not distribute over bag union
+query I
+SELECT count(*) FROM (SELECT 1 AS x INTERSECT ALL (SELECT 1 UNION ALL SELECT 1)) q
+----
+1
+
+query I
+SELECT count(*) FROM ((SELECT 1 AS x INTERSECT ALL SELECT 1) UNION ALL (SELECT 1 INTERSECT ALL SELECT 1)) q
+----
+2
+
+# D8 self-join multiplies multiplicities (R JOIN R is not R under bags)
+query I
+SELECT count(*) FROM t t1 JOIN t t2 ON t1.a = t2.a
+----
+5
+
+# D9 INTERSECT binds tighter than UNION/EXCEPT
+query I
+SELECT 1 UNION SELECT 2 INTERSECT SELECT 3
+----
+1
+
+# D10 FETCH FIRST ... WITH TIES returns all peers of the last row (SQL:2008)
+onlyif postgresql
+query I
+SELECT a FROM t ORDER BY a FETCH FIRST 1 ROWS WITH TIES
+----
+1
+1
+
+# ---------- E: joins and NULL padding ----------
+# E1
+query IT rowsort
+SELECT l.id, r.w FROM l LEFT JOIN r ON l.id = r.id
+----
+1 x
+1 y
+2 NULL
+3 NULL
+
+# E2 a right-side predicate in ON keeps the outer row
+query IT rowsort
+SELECT l.id, r.w FROM l LEFT JOIN r ON l.id = r.id AND r.w = 'x'
+----
+1 x
+2 NULL
+3 NULL
+
+# E3 the same predicate in WHERE rejects the padded rows (outer join becomes inner)
+query IT rowsort
+SELECT l.id, r.w FROM l LEFT JOIN r ON l.id = r.id WHERE r.w = 'x'
+----
+1 x
+
+# E4 a left-side predicate in ON never removes left rows
+query IT rowsort
+SELECT l.id, r.w FROM l LEFT JOIN r ON l.id = r.id AND l.id = 2
+----
+1 NULL
+2 NULL
+3 NULL
+
+# E5 COUNT(*) vs COUNT(col) after an outer join
+query III rowsort
+SELECT l.id, count(*), count(r.id) FROM l LEFT JOIN r ON l.id = r.id GROUP BY l.id
+----
+1 2 2
+2 1 0
+3 1 0
+
+# E6 NULL join keys never match under =, do under IS NOT DISTINCT FROM
+query II
+SELECT (SELECT count(*) FROM r r1 JOIN r r2 ON r1.id = r2.id),
+       (SELECT count(*) FROM r r1 JOIN r r2 ON r1.id IS NOT DISTINCT FROM r2.id)
+----
+4 5
+
+# E7 FULL JOIN: padding NULLs are indistinguishable from stored NULLs
+query IIT rowsort
+SELECT l.id, r.id, r.w FROM l FULL JOIN r ON l.id = r.id
+----
+1 1 x
+1 1 y
+2 NULL NULL
+3 NULL NULL
+NULL NULL z
+
+# ---------- F: ordering ----------
+# F1 default NULL placement is implementation-defined; PG/DuckDB: NULLs are "largest"
+onlyif postgresql
+query I
+SELECT a FROM t ORDER BY a
+----
+1
+1
+2
+NULL
+NULL
+
+onlyif postgresql
+query I
+SELECT a FROM t ORDER BY a DESC
+----
+NULL
+NULL
+2
+1
+1
+
+# DuckDB places NULLs last for both directions by default
+onlyif duckdb
+query I
+SELECT a FROM t ORDER BY a DESC
+----
+2
+1
+1
+NULL
+NULL
+
+# F2 explicit NULLS FIRST is portable
+query I
+SELECT a FROM t ORDER BY a NULLS FIRST
+----
+NULL
+NULL
+1
+1
+2
+
+# ---------- G: window functions ----------
+# G1 default frame with ORDER BY is RANGE UNBOUNDED PRECEDING..CURRENT ROW: peers share the value
+query TIII
+SELECT g, o, v, sum(v) OVER (PARTITION BY g ORDER BY o NULLS LAST) FROM w ORDER BY g, o NULLS LAST, v
+----
+a 1 10 10
+a 2 20 60
+a 2 30 60
+a 5 40 100
+b 1 5 5
+b NULL 7 12
+
+# G2 ROWS frame counts physical rows
+query TII
+SELECT g, v, sum(v) OVER (PARTITION BY g ORDER BY o NULLS LAST, v ROWS UNBOUNDED PRECEDING) FROM w ORDER BY g, o NULLS LAST, v
+----
+a 10 10
+a 20 30
+a 30 60
+a 40 100
+b 5 5
+b 7 12
+
+# G3 no ORDER BY: frame is the whole partition
+query TII
+SELECT g, v, sum(v) OVER (PARTITION BY g) FROM w ORDER BY g, v
+----
+a 10 100
+a 20 100
+a 30 100
+a 40 100
+b 5 12
+b 7 12
+
+# G4 LAST_VALUE trap: with the default frame it returns the current row's last peer
+query TII
+SELECT g, v, last_value(v) OVER (PARTITION BY g ORDER BY o NULLS LAST, v) FROM w ORDER BY g, o NULLS LAST, v
+----
+a 10 10
+a 20 20
+a 30 30
+a 40 40
+b 5 5
+b 7 7
+
+query TII
+SELECT g, v, last_value(v) OVER (PARTITION BY g ORDER BY o NULLS LAST, v ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM w ORDER BY g, o NULLS LAST, v
+----
+a 10 40
+a 20 40
+a 30 40
+a 40 40
+b 5 7
+b 7 7
+
+# G5 ranking family on partition a: o = 1,2,2,5
+query IIIIII
+SELECT o, row_number() OVER win, rank() OVER win, dense_rank() OVER win,
+       CAST(percent_rank() OVER win * 1000 AS INTEGER), CAST(cume_dist() OVER win * 1000 AS INTEGER)
+FROM w WHERE g = 'a' WINDOW win AS (ORDER BY o, v) ORDER BY o, v
+----
+1 1 1 1 0 250
+2 2 2 2 333 500
+2 3 3 3 667 750
+5 4 4 4 1000 1000
+
+query IIIII
+SELECT o, rank() OVER win, dense_rank() OVER win,
+       CAST(percent_rank() OVER win * 1000 AS INTEGER), CAST(cume_dist() OVER win * 1000 AS INTEGER)
+FROM w WHERE g = 'a' WINDOW win AS (ORDER BY o) ORDER BY o, v
+----
+1 1 1 0 250
+2 2 2 333 750
+2 2 2 333 750
+5 4 3 1000 1000
+
+# G6 RANGE offset is in key units; GROUPS offset is in peer groups (GROUPS: SQL:2011; absent in DuckDB 1.1)
+query III
+SELECT o, v, sum(v) OVER (ORDER BY o RANGE BETWEEN 1 PRECEDING AND CURRENT ROW)
+FROM w WHERE g = 'a' ORDER BY o, v
+----
+1 10 10
+2 20 60
+2 30 60
+5 40 40
+
+skipif duckdb
+query III
+SELECT o, v, sum(v) OVER (ORDER BY o GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW)
+FROM w WHERE g = 'a' ORDER BY o, v
+----
+1 10 10
+2 20 60
+2 30 60
+5 40 90
+
+# G7 EXCLUDE options
+query IIIII
+SELECT o, v,
+       sum(v) OVER (ORDER BY o ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW),
+       sum(v) OVER (ORDER BY o ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE GROUP),
+       sum(v) OVER (ORDER BY o ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE TIES)
+FROM w WHERE g = 'a' ORDER BY o, v
+----
+1 10 90 90 100
+2 20 80 50 70
+2 30 70 50 80
+5 40 60 60 100
+
+# G8 LAG/LEAD defaults and explicit default value
+query III
+SELECT v, lag(v) OVER (ORDER BY o, v), lead(v, 1, -1) OVER (ORDER BY o, v) FROM w WHERE g = 'a' ORDER BY o, v
+----
+10 NULL 20
+20 10 30
+30 20 40
+40 30 -1
+
+# G9 NTILE puts the remainder in the first buckets
+query II
+SELECT v, ntile(3) OVER (ORDER BY o, v) FROM w WHERE g = 'a' ORDER BY o, v
+----
+10 1
+20 1
+30 2
+40 3
+
+# G10 windows run after GROUP BY and may nest aggregates
+query TII rowsort
+SELECT g, sum(v), sum(sum(v)) OVER () FROM w GROUP BY g
+----
+a 100 112
+b 12 112
+
+# G11 window functions are illegal in WHERE
+statement error
+SELECT * FROM w WHERE row_number() OVER () = 1
+
+# G12 empty frame: SUM -> NULL, COUNT -> 0
+query III
+SELECT v, sum(v) OVER fr, count(*) OVER fr FROM w WHERE g = 'b'
+WINDOW fr AS (ORDER BY o NULLS LAST ROWS BETWEEN 2 FOLLOWING AND 3 FOLLOWING) ORDER BY o NULLS LAST
+----
+5 NULL 0
+7 NULL 0
+
+# G13 RANGE offset with a NULL ordering key: the NULL row's frame is its NULL peer group
+query TII
+SELECT CAST(o AS VARCHAR), v, sum(v) OVER (ORDER BY o NULLS LAST RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) FROM w WHERE g = 'b' ORDER BY o NULLS LAST
+----
+1 5 5
+NULL 7 7
+
+# G14 negative frame offset is an error (SQLSTATE 22013 in PG; DuckDB 1.1 accepts it)
+skipif duckdb
+statement error
+SELECT sum(v) OVER (ORDER BY o ROWS BETWEEN -1 PRECEDING AND CURRENT ROW) FROM w
+
+# G15 top-1 per group needs a derived table (or QUALIFY in Teradata/DuckDB/Snowflake)
+query TI rowsort
+SELECT g, v FROM (SELECT g, v, row_number() OVER (PARTITION BY g ORDER BY v DESC) AS rn FROM w) q WHERE rn = 1
+----
+a 40
+b 7
+
+# ---------- H: DML and constraint semantics ----------
+# H1 SET clauses read the pre-update row (MySQL evaluates left to right)
+statement ok
+CREATE TABLE sw(x INTEGER, y INTEGER)
+
+statement ok
+INSERT INTO sw VALUES (1, 2)
+
+statement ok
+UPDATE sw SET x = y, y = x
+
+query II
+SELECT x, y FROM sw
+----
+2 1
+
+# H2 UNIQUE is checked at statement end in the standard; PG (and DuckDB 1.1) check non-deferrable keys per row
+statement ok
+CREATE TABLE u(id INTEGER PRIMARY KEY)
+
+statement ok
+INSERT INTO u VALUES (1),(2),(3)
+
+onlyif postgresql
+statement error
+UPDATE u SET id = id + 1
+
+onlyif postgresql
+statement ok
+CREATE TABLE ud(id INTEGER, CONSTRAINT ud_pk PRIMARY KEY (id) DEFERRABLE INITIALLY IMMEDIATE)
+
+onlyif postgresql
+statement ok
+INSERT INTO ud VALUES (1),(2),(3)
+
+onlyif postgresql
+statement ok
+UPDATE ud SET id = id + 1
+
+onlyif postgresql
+query I
+SELECT id FROM ud ORDER BY id
+----
+2
+3
+4
+
+# H3 a failing statement leaves no partial effects
+statement error
+INSERT INTO u VALUES (10),(11),(1)
+
+query I
+SELECT count(*) FROM u WHERE id IN (10, 11)
+----
+0
+
+# H4 INSERT ... SELECT from the target reads a pre-statement snapshot (no Halloween loop)
+statement ok
+CREATE TABLE h(x INTEGER)
+
+statement ok
+INSERT INTO h VALUES (1),(2)
+
+statement ok
+INSERT INTO h SELECT x + 10 FROM h
+
+query I
+SELECT count(*) FROM h
+----
+4
+
+# H5 subqueries in UPDATE see the pre-statement state
+statement ok
+CREATE TABLE m(x INTEGER)
+
+statement ok
+INSERT INTO m VALUES (1),(2),(3)
+
+statement ok
+UPDATE m SET x = (SELECT max(x) FROM m) + x
+
+query I
+SELECT x FROM m ORDER BY x
+----
+4
+5
+6
+
+# H6 DELETE predicate with a self-referencing aggregate is evaluated once, set-at-a-time
+statement ok
+CREATE TABLE dm(x INTEGER)
+
+statement ok
+INSERT INTO dm VALUES (1),(2),(3),(10)
+
+statement ok
+DELETE FROM dm WHERE x = (SELECT min(x) FROM dm)
+
+query I
+SELECT x FROM dm ORDER BY x
+----
+2
+3
+10
+
+# H7 UNIQUE admits several NULLs (SQL Server admits one; PG15+ NULLS NOT DISTINCT admits one)
+statement ok
+CREATE TABLE un(x INTEGER UNIQUE)
+
+statement ok
+INSERT INTO un VALUES (NULL),(NULL)
+
+onlyif postgresql
+statement ok
+CREATE TABLE un2(x INTEGER UNIQUE NULLS NOT DISTINCT)
+
+onlyif postgresql
+statement error
+INSERT INTO un2 VALUES (NULL),(NULL)
+
+# H8 composite FK, MATCH SIMPLE (default): any NULL column satisfies the constraint
+onlyif postgresql
+statement ok
+CREATE TABLE fp(a INTEGER, b INTEGER, PRIMARY KEY (a, b))
+
+onlyif postgresql
+statement ok
+CREATE TABLE fc(a INTEGER, b INTEGER, FOREIGN KEY (a, b) REFERENCES fp)
+
+onlyif postgresql
+statement ok
+INSERT INTO fc VALUES (99, NULL)
+
+onlyif postgresql
+statement ok
+CREATE TABLE fcf(a INTEGER, b INTEGER, FOREIGN KEY (a, b) REFERENCES fp MATCH FULL)
+
+onlyif postgresql
+statement error
+INSERT INTO fcf VALUES (99, NULL)
+
+onlyif postgresql
+statement ok
+INSERT INTO fcf VALUES (NULL, NULL)
+
+# H9 deferred FK: a cycle inserted inside one transaction; the violation surfaces at COMMIT
+onlyif postgresql
+statement ok
+CREATE TABLE dp(id INTEGER PRIMARY KEY, parent INTEGER REFERENCES dp DEFERRABLE INITIALLY DEFERRED)
+
+onlyif postgresql
+statement ok
+BEGIN
+
+onlyif postgresql
+statement ok
+INSERT INTO dp VALUES (1, 2)
+
+onlyif postgresql
+statement ok
+INSERT INTO dp VALUES (2, 1)
+
+onlyif postgresql
+statement ok
+COMMIT
+
+onlyif postgresql
+statement ok
+BEGIN
+
+onlyif postgresql
+statement ok
+INSERT INTO dp VALUES (3, 99)
+
+onlyif postgresql
+statement error
+COMMIT
+
+onlyif postgresql
+query I
+SELECT count(*) FROM dp
+----
+2
+
+# H10 sequences are not transactional: rollback leaves a gap
+onlyif postgresql
+statement ok
+CREATE SEQUENCE sq
+
+onlyif postgresql
+statement ok
+BEGIN
+
+onlyif postgresql
+query I
+SELECT nextval('sq')
+----
+1
+
+onlyif postgresql
+statement ok
+ROLLBACK
+
+onlyif postgresql
+query I
+SELECT nextval('sq')
+----
+2
+
+# H11 MERGE: a target row matched by two source rows is a cardinality violation
+onlyif postgresql
+statement ok
+CREATE TABLE mt(k INTEGER PRIMARY KEY, v INTEGER)
+
+onlyif postgresql
+statement ok
+INSERT INTO mt VALUES (1, 0), (2, 0)
+
+onlyif postgresql
+statement error
+MERGE INTO mt USING (VALUES (1, 5), (1, 6)) src(k, v) ON mt.k = src.k WHEN MATCHED THEN UPDATE SET v = src.v
+
+# H12 MERGE: WHEN clauses are tried in order; the first whose condition holds wins
+onlyif postgresql
+statement ok
+MERGE INTO mt USING (VALUES (1, 5), (2, -1), (3, 7)) src(k, v) ON mt.k = src.k
+WHEN MATCHED AND src.v > 0 THEN UPDATE SET v = src.v
+WHEN MATCHED THEN DELETE
+WHEN NOT MATCHED THEN INSERT VALUES (src.k, src.v)
+
+onlyif postgresql
+query II
+SELECT k, v FROM mt ORDER BY k
+----
+1 5
+3 7
+
+# H13 view WITH CHECK OPTION rejects rows that would leave the view
+statement ok
+CREATE TABLE base(x INTEGER)
+
+onlyif postgresql
+statement ok
+CREATE VIEW pos AS SELECT x FROM base WHERE x > 0 WITH CHECK OPTION
+
+onlyif postgresql
+statement error
+INSERT INTO pos VALUES (-5)
+
+# H14 ON DELETE CASCADE vs NO ACTION
+onlyif postgresql
+statement ok
+CREATE TABLE par(id INTEGER PRIMARY KEY)
+
+onlyif postgresql
+statement ok
+CREATE TABLE chc(pid INTEGER REFERENCES par ON DELETE CASCADE)
+
+onlyif postgresql
+statement ok
+CREATE TABLE chn(pid INTEGER REFERENCES par)
+
+onlyif postgresql
+statement ok
+INSERT INTO par VALUES (1),(2)
+
+onlyif postgresql
+statement ok
+INSERT INTO chc VALUES (1),(1),(2)
+
+onlyif postgresql
+statement ok
+INSERT INTO chn VALUES (2)
+
+onlyif postgresql
+statement ok
+DELETE FROM par WHERE id = 1
+
+onlyif postgresql
+query I
+SELECT count(*) FROM chc
+----
+1
+
+onlyif postgresql
+statement error
+DELETE FROM par WHERE id = 2
+
+# ---------- I: triggers (PostgreSQL syntax; semantics are the SQL:1999 model) ----------
+onlyif postgresql
+statement ok
+CREATE TABLE tg(x INTEGER)
+
+onlyif postgresql
+statement ok
+CREATE TABLE tlog(kind VARCHAR, n INTEGER)
+
+onlyif postgresql
+statement ok
+CREATE FUNCTION f_row() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO tlog VALUES ('row', NULL); RETURN NEW; END $$
+
+onlyif postgresql
+statement ok
+CREATE FUNCTION f_stmt() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO tlog SELECT 'stmt', count(*) FROM nt; RETURN NULL; END $$
+
+onlyif postgresql
+statement ok
+CREATE TRIGGER tr_row AFTER UPDATE ON tg FOR EACH ROW EXECUTE FUNCTION f_row()
+
+onlyif postgresql
+statement ok
+CREATE TRIGGER tr_stmt AFTER UPDATE ON tg REFERENCING NEW TABLE AS nt FOR EACH STATEMENT EXECUTE FUNCTION f_stmt()
+
+onlyif postgresql
+statement ok
+INSERT INTO tg VALUES (1),(2),(3)
+
+# I1 an UPDATE touching zero rows fires the statement trigger once and no row trigger
+onlyif postgresql
+statement ok
+UPDATE tg SET x = x WHERE x > 100
+
+onlyif postgresql
+query TI rowsort
+SELECT kind, n FROM tlog
+----
+stmt 0
+
+# I2 three rows: three row firings, one statement firing whose transition table has 3 rows
+onlyif postgresql
+statement ok
+DELETE FROM tlog
+
+onlyif postgresql
+statement ok
+UPDATE tg SET x = x + 1
+
+onlyif postgresql
+query TI rowsort
+SELECT kind, n FROM tlog
+----
+row NULL
+row NULL
+row NULL
+stmt 3
+
+# I3 BEFORE ROW trigger rewrites NEW before constraints are checked
+onlyif postgresql
+statement ok
+CREATE TABLE clamp(x INTEGER CHECK (x <= 100))
+
+onlyif postgresql
+statement ok
+CREATE FUNCTION f_clamp() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.x := least(NEW.x, 100); RETURN NEW; END $$
+
+onlyif postgresql
+statement ok
+CREATE TRIGGER tr_clamp BEFORE INSERT ON clamp FOR EACH ROW EXECUTE FUNCTION f_clamp()
+
+onlyif postgresql
+statement ok
+INSERT INTO clamp VALUES (500)
+
+onlyif postgresql
+query I
+SELECT x FROM clamp
+----
+100
+
+# I4 BEFORE ROW returning NULL silently skips the row
+onlyif postgresql
+statement ok
+CREATE FUNCTION f_skip() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.x < 0 THEN RETURN NULL; END IF; RETURN NEW; END $$
+
+onlyif postgresql
+statement ok
+CREATE TRIGGER tr_skip BEFORE INSERT ON clamp FOR EACH ROW EXECUTE FUNCTION f_skip()
+
+onlyif postgresql
+statement ok
+INSERT INTO clamp VALUES (-1), (7)
+
+onlyif postgresql
+query I
+SELECT x FROM clamp ORDER BY x
+----
+7
+100
+
+# ---------- J: strings, padding, Unicode ----------
+# J1 CHAR(n) comparison pads with spaces; VARCHAR/TEXT does not
+onlyif postgresql
+query TT
+SELECT CASE WHEN CAST('a' AS CHAR(3)) = CAST('a  ' AS CHAR(5)) THEN 'T' ELSE 'F' END,
+       CASE WHEN CAST('a' AS VARCHAR(3)) = CAST('a  ' AS VARCHAR(5)) THEN 'T' ELSE 'F' END
+----
+T F
+
+# J2 characters vs bytes (UTF-8 database)
+onlyif postgresql
+query II
+SELECT char_length(chr(233)), octet_length(chr(233))
+----
+1 2
+
+# J3 canonically equivalent strings are unequal under a deterministic binary comparison
+query T
+SELECT CASE WHEN chr(233) = 'e' || chr(769) THEN 'T' ELSE 'F' END
+----
+F
+
+onlyif postgresql
+query T
+SELECT CASE WHEN normalize(chr(233), NFC) = normalize('e' || chr(769), NFC) THEN 'T' ELSE 'F' END
+----
+T
+
+# J4 LIKE is case-sensitive under binary/deterministic collations (MySQL's default _ci collations differ)
+query T
+SELECT CASE WHEN 'ABC' LIKE 'abc' THEN 'T' ELSE 'F' END
+----
+F
+
+# J5 binary (C) collation orders upper case before lower case
+onlyif postgresql
+query T
+SELECT x FROM (VALUES ('a'),('B'),('b'),('A')) v(x) ORDER BY x COLLATE "C"
+----
+A
+B
+a
+b
+
+# ---------- K: numeric typing, binding, recursion ----------
+# K1 integer / integer: PG truncates; DuckDB's "/" is true division ("//" is integer division)
+onlyif postgresql
+query I
+SELECT 7 / 2
+----
+3
+
+onlyif duckdb
+query T
+SELECT CAST(7 / 2 AS VARCHAR)
+----
+3.5
+
+# K2 integer overflow is an exception, never wraparound
+statement error
+SELECT CAST(2147483647 AS INTEGER) + CAST(1 AS INTEGER)
+
+# K3 invalid cast is an exception
+statement error
+SELECT CAST('abc' AS INTEGER)
+
+# K4 functional dependency on a primary key licenses non-grouped columns (SQL:1999 T301)
+onlyif postgresql
+statement ok
+CREATE TABLE fd(id INTEGER PRIMARY KEY, v VARCHAR)
+
+onlyif postgresql
+statement ok
+SELECT id, v FROM fd GROUP BY id
+
+statement error
+SELECT a, b FROM t GROUP BY a
+
+# K5 SELECT DISTINCT with ORDER BY on a non-selected expression is rejected
+onlyif postgresql
+statement error
+SELECT DISTINCT a FROM t ORDER BY b
+
+# K6 recursive CTE with UNION (not ALL) terminates by duplicate elimination
+query I
+WITH RECURSIVE rc(n) AS (SELECT 1 UNION SELECT n FROM rc) SELECT count(*) FROM rc
+----
+1
+
+query I
+WITH RECURSIVE rc(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM rc WHERE n < 5) SELECT sum(n) FROM rc
+----
+15

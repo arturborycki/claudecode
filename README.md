@@ -26,7 +26,12 @@ cd claudecode
 │       ├── MEMORY.md                # System-wide standards (all projects)
 │       ├── INFRASTRUCTURE.md        # Global server/service reference
 │       ├── settings.json            # Global permissions & env vars
-│       ├── skill-library/           # Menu of skills to pick from per-project (NEW)
+│       ├── skill-library/           # Menu of skills to pick from per-project
+│       │   ├── README.md            # Library guide: every skill, agent, composition examples
+│       │   ├── <skill>/SKILL.md     # 35 database-internals skills (each may have references/, scripts/)
+│       │   ├── edbs-reference/      # Index of all 1,414 EDBS entries + scripts/edbs.py lookup tool
+│       │   ├── agents/              # 12 agents: rdbms-architect, 10 specialists, engine-dev
+│       │   └── rules/               # engine-internals.md, rdbms-expert-method.md
 │       ├── bin/
 │       │   └── claude-skills-init   # Interactive skill picker (NEW)
 │       ├── commands/                # Global custom commands
@@ -146,18 +151,85 @@ claude-skills-init --link     # symlink instead of copy (single source of truth)
 ```
 
 Selected skills land in `.claude/skills/`. The picker also offers the bundled
-agent (`engine-dev`) into `.claude/agents/` and rules into `.claude/rules/`.
-Inside a session you can use `/skills` instead of dropping to the shell.
+agent team into `.claude/agents/` and rules into `.claude/rules/`. Commit
+`.claude/` so skills and agents travel with the repo (including to Claude
+Code web sessions and teammates). Inside a session you can use `/skills`
+instead of dropping to the shell.
+
+Agents preload skills by name (`skills:` in their frontmatter), so when you
+install an agent, install the skills it lists. For an engine repo, picking
+`a` (all) is simplest. To refresh skills a project already has, run
+`claude-skills-init --force`.
 
 ### What's in the library
 
-A database / query-engine internals set (14 skills) for C/C++/Rust work —
-query plan design, SQL front end, optimizer, joins, columnar/Arrow layout,
-storage & indexing, page/file formats, LSM storage, transactions & recovery,
-parallel execution, replication & consistency, consensus, distributed
-transactions, and testing — plus an `engine-dev` agent. See
-`global/.claude/skill-library/README.md`. Drop your own skill folders into the
-library to extend the menu.
+**35 database / query-engine internals skills** for C/C++/Rust engine work,
+built from four references: *How Query Engines Work* (Grove), *Database
+Systems: The Complete Book* (Garcia-Molina/Ullman/Widom), *Database
+Internals* (Petrov) and the *Encyclopedia of Database Systems*, 2nd ed.
+(Liu & Özsu, eds., "EDBS").
+
+| Group | Skills |
+|---|---|
+| Query pipeline | `query-plan-design`, `sql-frontend`, `query-optimizer`, `join-algorithms`, `query-execution-advanced`, `cardinality-and-statistics`, `materialized-views-ivm` |
+| Foundations | `dbms-architecture`, `relational-theory`, `sql-semantics-and-active-rules` |
+| Storage | `columnar-arrow-layout`, `storage-and-indexing`, `page-and-file-format`, `lsm-storage`, `storage-devices-and-io`, `index-structures-catalog`, `multidimensional-and-similarity-indexing` (incl. vector ANN: HNSW, IVF-PQ, DiskANN) |
+| Transactions | `transactions-and-recovery`, `concurrency-control-theory`, `recovery-and-durability` |
+| Scale-out | `parallel-distributed-execution`, `parallel-database-systems`, `distributed-dbms-design`, `replication-and-consistency`, `replication-protocols`, `distributed-consensus`, `distributed-transactions` |
+| Analytical & specialised | `olap-and-warehouse-engines`, `stream-processing-engines`, `temporal-databases`, `beyond-relational-engines` |
+| Operations & safety | `query-engine-testing`, `tuning-and-benchmarking`, `database-security-internals` |
+| Literature | `edbs-reference`: index of all 1,414 EDBS entries plus a script that pulls any entry's full text from your own copy of the book |
+
+The 20 EDBS-based skills each carry `references/` deep dives and a
+`references/edbs-entries.md` source map with printed page numbers. Content
+is paraphrased and synthesised, not copied, and was independently reviewed
+for technical accuracy. Material newer than the 2018 book is marked
+*Beyond EDBS*. `sql-semantics-and-active-rules` includes ~200 runnable
+sqllogictest vectors checked against PostgreSQL 16 and DuckDB 1.1.
+
+**12 agents:**
+
+| Agent | Use for |
+|---|---|
+| `rdbms-architect` | Lead: cross-cutting designs, ADRs, routing work to specialists |
+| `query-optimizer-engineer` | Rewrites, decorrelation, join enumeration, cardinality, MV matching |
+| `execution-engine-engineer` | Operators, vectorization, memory/spill, window functions, top-k |
+| `storage-engine-engineer` | Page formats, buffer pool, indexes, device-aware I/O |
+| `transaction-recovery-engineer` | Isolation levels, 2PL/MVCC/SSI, WAL/ARIES, backup |
+| `distributed-db-engineer` | MPP, partitioning, skew, replication, consensus, 2PC |
+| `analytics-engine-engineer` | OLAP/warehouse features, streaming, temporal tables |
+| `db-security-engineer` | Authorization enforcement, encryption at rest, audit |
+| `db-performance-engineer` | Benchmarks, profiling, tuning, workload management |
+| `db-correctness-auditor` | Independent adversarial review before merge (read-only + Bash) |
+| `rdbms-professor` | Theory, literature, reading plans, examining understanding |
+| `engine-dev` | Rust/C/C++ implementation with test-first, sanitizer and benchmark gates |
+
+Typical flow: `rdbms-architect` designs → specialists go deep →
+`engine-dev` implements → `db-correctness-auditor` reviews. Ask by name
+("have rdbms-architect design …") or let Claude delegate from the agent
+descriptions; `/agents` lists them.
+
+Full catalogue, per-agent skill dependencies and composition examples:
+`global/.claude/skill-library/README.md`. Drop your own skill folders into
+the library to extend the menu.
+
+### EDBS lookup tool (optional)
+
+`edbs-reference` searches all 1,414 entry titles and their cross-references
+offline. To print an entry's full text it reads your own PDF copy of the
+encyclopedia:
+
+```bash
+export EDBS_PDF=/path/to/edbs.pdf   # add to ~/.zshrc
+brew install poppler                              # provides pdftotext (or: pip install pypdf)
+python3 .claude/skills/edbs-reference/scripts/edbs.py search snapshot isolation
+python3 .claude/skills/edbs-reference/scripts/edbs.py show "Serializable Snapshot Isolation" --section Foundations
+```
+
+### Updating the library
+
+Edit skills in this repo → `git pull` on each machine → `./setup-global.sh`
+→ in each project run `claude-skills-init --force` and commit `.claude/`.
 
 ### A note on hooks
 

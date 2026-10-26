@@ -86,3 +86,8 @@ threshold, not just below it); all of inner/left/right/full/semi/anti.
 ## Grounding
 DBMS §15.3 (nested-loop), §15.4 (two-pass sort-based), §15.5 (two-pass
 hash-based), §15.6 (index-based). HQEW *Joins*.
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Hash Join* (p.1682); *Sort-Merge Join* (p.3546); *Nested Loop Join* (p.2485); *Index Join* (p.1845); *Semijoin* (p.3436); *Join* (p.2049).
+Go deeper with: `query-execution-advanced`, `parallel-database-systems`.

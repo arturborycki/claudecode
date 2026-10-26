@@ -80,3 +80,8 @@ The planning logic is yours regardless of who wrote the parser.
 ## Grounding
 HQEW *SQL Support* (tokenizing, Pratt parsers, precedence, parsing SELECT,
 SQL planning, aggregate queries). DBMS §16.1 (parsing and preprocessing).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*SQL* (p.3666); *Query Language* (p.2994); *Data Definition Language (DDL)* (p.748); *Data Manipulation Language (DML)* (p.792); *Relational Algebra* (p.3146).
+Go deeper with: `sql-semantics-and-active-rules`, `relational-theory`.

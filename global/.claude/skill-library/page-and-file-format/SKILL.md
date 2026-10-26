@@ -93,3 +93,8 @@ Petrov Ch 3 (file formats: binary encoding, page structure, slotted pages,
 cell layout, variable-size data, versioning, checksumming), Ch 4 (page
 header, implementing B-trees). DBMS Ch 13 (arranging data on disk,
 block/record addresses, variable-length records).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Storage Manager* (p.3736); *Index Creation and File Structures* (p.1842); *Checksum and Cyclic Redundancy Check Mechanism* (p.423); *Disk* (p.1143).
+Go deeper with: `storage-devices-and-io`, `recovery-and-durability`.

@@ -90,3 +90,8 @@ blanket winner.
 Petrov Ch 7 (LSM trees, read/write/space amplification, implementation
 details, unordered LSM storage, concurrency, log stacking, LLAMA). Petrov
 Ch 1 (buffering, immutability, ordering).
+
+## EDBS grounding & deeper skills
+EDBS 2e entries (pull full text with `edbs-reference`: `python3 <edbs-reference>/scripts/edbs.py show "<Entry>"`):
+*Bloom Filters* (p.320); *Solid State Drive (SSD)* (p.3545); *Storage Devices* (p.3726).
+Go deeper with: `storage-devices-and-io`, `index-structures-catalog`, `beyond-relational-engines`.
